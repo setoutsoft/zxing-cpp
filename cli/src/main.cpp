@@ -37,6 +37,10 @@
 #include <zxing/multi/ByQuadrantReader.h>
 #include <zxing/multi/MultipleBarcodeReader.h>
 #include <zxing/multi/GenericMultipleBarcodeReader.h>
+#include <windows.h>
+#include <gdiplus.h>
+#include <gdiplusinit.h>
+#pragma comment(lib,"gdiplus.lib")
 
 using namespace std;
 using namespace zxing;
@@ -179,6 +183,8 @@ string read_expected(string imagefilename) {
   return expected;
 }
 
+using namespace Gdiplus;
+
 int main(int argc, char** argv) {
   if (argc <= 1) {
     cout << "Usage: " << argv[0] << " [OPTION]... <IMAGE>..." << endl
@@ -198,6 +204,11 @@ int main(int argc, char** argv) {
          << endl;
     return 1;
   }
+
+  GdiplusStartupInput gdiplusStartupInput;
+  ULONG_PTR _gdiPlusToken;
+
+  BOOL bOK = Ok == GdiplusStartup(&_gdiPlusToken, &gdiplusStartupInput, NULL);
 
   int total = 0;
   int gonly = 0;
@@ -253,34 +264,52 @@ int main(int argc, char** argv) {
       cerr << "Testing: " << filename << endl;
     }
 
-    Ref<LuminanceSource> source;
-    try {
-      source = ImageReaderSource::create(filename);
-    } catch (const zxing::IllegalArgumentException &e) {
-      cerr << e.what() << " (ignoring)" << endl;
-      continue;
-    }
+	WIN32_FIND_DATA fd;
+	HANDLE hf = FindFirstFile(filename.c_str(), &fd);
+	if (hf != INVALID_HANDLE_VALUE)
+	{
+		std::string path;
+		int pos = filename.rfind('\\');
+		if (pos != -1)
+		{
+			path = filename.substr(0, pos+1);
+		}
+		do
+		{
+			std::string fname = path + fd.cFileName;
+			printf("check %s:\n", fname.c_str());
+			Ref<LuminanceSource> source;
+			try {
+				source = ImageReaderSource::create(fname);
+			}
+			catch (const zxing::IllegalArgumentException &e) {
+				cerr << e.what() << " (ignoring)" << endl;
+				continue;
+			}
 
-    string expected = read_expected(filename);
+			string expected;// = read_expected(filename);
 
-    int gresult = 1;
-    int hresult = 1;
-    if (use_hybrid) {
-      hresult = read_image(source, true, expected);
-    }
-    if (use_global && (verbose || hresult != 0)) {
-      gresult = read_image(source, false, expected);
-      if (!verbose && gresult != 0) {
-        cout << "decoding failed" << endl;
-      }
-    }
-    gresult = gresult == 0;
-    hresult = hresult == 0;
-    gonly += gresult && !hresult;
-    honly += hresult && !gresult;
-    both += gresult && hresult;
-    neither += !gresult && !hresult;
-    total = total + 1;
+			int gresult = 1;
+			int hresult = 1;
+			if (use_hybrid) {
+				hresult = read_image(source, true, expected);
+			}
+			if (use_global && (verbose || hresult != 0)) {
+				gresult = read_image(source, false, expected);
+				if (!verbose && gresult != 0) {
+					cout << "decoding failed" << endl;
+				}
+			}
+			gresult = gresult == 0;
+			hresult = hresult == 0;
+			gonly += gresult && !hresult;
+			honly += hresult && !gresult;
+			both += gresult && hresult;
+			neither += !gresult && !hresult;
+			total = total + 1;
+		} while (FindNextFile(hf, &fd));
+	}
+	FindClose(hf);
   }
 
   if (test_mode) {
@@ -293,5 +322,6 @@ int main(int argc, char** argv) {
          << " passed only global, " << neither << " pass neither." << endl;
   }
 
+  GdiplusShutdown(_gdiPlusToken);
   return 0;
 }

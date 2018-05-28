@@ -22,6 +22,9 @@
 #include <algorithm>
 #include "lodepng.h"
 #include "jpgd.h"
+#include <Windows.h>
+#include <gdiplus.h>
+using namespace Gdiplus;
 
 using std::string;
 using std::ostringstream;
@@ -44,6 +47,17 @@ inline char ImageReaderSource::convertPixel(char const* pixel_) const {
     throw zxing::IllegalArgumentException("Unexpected image depth");
   }
 }
+
+#define WIDBYTES(x) ((x+31)/8)
+
+#pragma pack(push,1)
+struct RGBTABLE {
+	unsigned char b;
+	unsigned char g;
+	unsigned char r;
+};
+#pragma pack(pop)
+
 
 ImageReaderSource::ImageReaderSource(ArrayRef<char> image_, int width, int height, int comps_)
     : Super(width, height), image(image_), comps(comps_) {}
@@ -77,6 +91,32 @@ Ref<LuminanceSource> ImageReaderSource::create(string const& filename) {
     image = zxing::ArrayRef<char>(buffer, 4 * width * height);
     free(buffer);
   }
+  else if (extension == "bmp")
+  {
+	  WCHAR wname[1024];
+	  int fs = MultiByteToWideChar(CP_ACP, 0, filename.c_str(), filename.size(), wname, 1024);
+	  wname[fs] = 0;
+	  Gdiplus::Bitmap *bmp = Gdiplus::Bitmap::FromFile(wname);
+	  if (bmp)
+	  {
+		  Rect rect(0, 0, bmp->GetWidth(), bmp->GetHeight());
+
+		  BitmapData* bitmapData = new BitmapData;
+
+		  bmp->LockBits(
+			  &rect,
+			  ImageLockModeRead,
+			  PixelFormat32bppARGB,
+			  bitmapData);
+		 
+		  width = bmp->GetWidth();
+		  height = bmp->GetHeight();
+		  comps = 4;
+		  image = zxing::ArrayRef<char>((char*)bitmapData->Scan0, 4 * width * height);
+
+		  bmp->UnlockBits(bitmapData);
+	  }
+  }
   if (!image) {
     ostringstream msg;
     msg << "Loading \"" << filename << "\" failed.";
@@ -84,6 +124,7 @@ Ref<LuminanceSource> ImageReaderSource::create(string const& filename) {
   }
 
   return Ref<LuminanceSource>(new ImageReaderSource(image, width, height, comps));
+
 }
 
 zxing::ArrayRef<char> ImageReaderSource::getRow(int y, zxing::ArrayRef<char> row) const {
