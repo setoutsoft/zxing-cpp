@@ -48,15 +48,45 @@ inline char ImageReaderSource::convertPixel(char const* pixel_) const {
   }
 }
 
-#define WIDBYTES(x) ((x+31)/8)
+bool ImageReaderSource::makeMirror(bool bX)
+{
+	if (comps != 4) return false;
 
-#pragma pack(push,1)
-struct RGBTABLE {
-	unsigned char b;
-	unsigned char g;
-	unsigned char r;
-};
-#pragma pack(pop)
+	char* pixelData = &image[0];
+
+	int stride = getWidth() * 4;
+
+	if (bX)
+	{//mirror for horzontal.
+		char t[4];
+		for (int y = 0; y < getHeight(); y++)
+		{
+			char *pLine = pixelData + stride * y;
+			for (int x = 0; x < getWidth() / 2; x++)
+			{
+				char *p1 = pLine + x * 4;
+				char *p2 = pLine + (getWidth() - x - 1) * 4;
+				memcpy(t, p1, 4);
+				memcpy(p1, p2, 4);
+				memcpy(p2, t, 4);
+			}
+		}
+	}
+	else
+	{//swap lines
+		char *tLine = new char[stride];
+		for (int i = 0; i < getHeight() / 2; i++)
+		{
+			char * p1 = pixelData + stride*i;
+			char * p2 = pixelData + stride*(getHeight() - i - 1);
+			memcpy(tLine, p1, stride);
+			memcpy(p1, p2, stride);
+			memcpy(p2, tLine, stride);
+		}
+		delete[]tLine;
+	}
+	return true;
+}
 
 
 ImageReaderSource::ImageReaderSource(ArrayRef<char> image_, int width, int height, int comps_)

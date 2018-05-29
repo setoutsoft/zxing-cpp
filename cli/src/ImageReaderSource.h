@@ -23,13 +23,16 @@ class ImageReaderSource : public zxing::LuminanceSource {
 private:
   typedef LuminanceSource Super;
 
-  const zxing::ArrayRef<char> image;
+  zxing::ArrayRef<char> image;
   const int comps;
 
   char convertPixel(const char* pixel) const;
 
+
 public:
   static zxing::Ref<LuminanceSource> create(std::string const& filename);
+
+  bool makeMirror(bool bX);
 
   ImageReaderSource(zxing::ArrayRef<char> image, int width, int height, int comps);
 

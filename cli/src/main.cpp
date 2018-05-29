@@ -70,7 +70,14 @@ vector<Ref<Result> > decode_multi(Ref<BinaryBitmap> image, DecodeHints hints) {
   return reader.decodeMultiple(image, hints);
 }
 
-int read_image(Ref<LuminanceSource> source, bool hybrid, string expected) {
+enum MirrorFlag {
+	mirror_none = 0,
+	mirror_x,
+	mirror_y,
+	mirror_xy,
+};
+
+int read_image(Ref<LuminanceSource> source, bool hybrid, string expected, MirrorFlag mirrorFlag) {
   vector<Ref<Result> > results;
   string cell_result;
   int res = -1;
@@ -92,6 +99,24 @@ int read_image(Ref<LuminanceSource> source, bool hybrid, string expected) {
     }
     res = 0;
   } catch (const ReaderException& e) {
+	  switch (mirrorFlag)
+	  {
+	  case mirror_none:
+		  cout << "decode ori failed. try mirror in y" << endl;
+		  source->makeMirror(false);//make mirror in y
+		  return read_image(source, hybrid, expected, mirror_y);
+	  case mirror_y:
+		  cout << "decode y-mirror failed. try mirror in x" << endl;
+		  source->makeMirror(false);//restore;
+		  source->makeMirror(true);//make mirror in x
+		  return read_image(source, hybrid, expected, mirror_x);
+	  case mirror_x:
+		  cout << "decode x-mirror failed. try mirror in xy" << endl;
+		  source->makeMirror(false);//make mirror in y
+		  return read_image(source, hybrid, expected, mirror_xy);
+	  default:
+		  break;
+	  }
     cell_result = "zxing::ReaderException: " + string(e.what());
     res = -2;
   } catch (const zxing::IllegalArgumentException& e) {
@@ -291,15 +316,17 @@ int main(int argc, char** argv) {
 
 			int gresult = 1;
 			int hresult = 1;
+
 			if (use_hybrid) {
-				hresult = read_image(source, true, expected);
+				hresult = read_image(source, true, expected,mirror_none);
 			}
 			if (use_global && (verbose || hresult != 0)) {
-				gresult = read_image(source, false, expected);
+				gresult = read_image(source, false, expected, mirror_none);
 				if (!verbose && gresult != 0) {
 					cout << "decoding failed" << endl;
 				}
 			}
+
 			gresult = gresult == 0;
 			hresult = hresult == 0;
 			gonly += gresult && !hresult;

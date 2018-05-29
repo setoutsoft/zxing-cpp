@@ -38,6 +38,9 @@ class LuminanceSource : public Counted {
   int getWidth() const { return width; }
   int getHeight() const { return height; }
 
+  virtual bool makeMirror(bool bX) {
+	  return false;
+  };
   // Callers take ownership of the returned memory and must call delete [] on it themselves.
   virtual ArrayRef<char> getRow(int y, ArrayRef<char> row) const = 0;
   virtual ArrayRef<char> getMatrix() const = 0;
