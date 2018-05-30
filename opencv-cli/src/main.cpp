@@ -74,10 +74,26 @@ int main(int argc, char** argv) {
 			Mat src_gray;
 			src = imread(fname, 1);
 			cvtColor(src, src_gray, CV_BGR2GRAY);
-			blur(src_gray, src_gray, Size(3, 3));
-			equalizeHist(src_gray, src_gray);
 
-			Ref<LuminanceSource> source = MatSource::create(src_gray);
+			Mat binImg;
+			int thre = (int)threshold(src_gray, binImg, 0, 255, cv::THRESH_OTSU);
+			cout << "threshold:" << thre << endl;
+			//blur(src_gray, src_gray, Size(3, 3));
+			//equalizeHist(src_gray, src_gray);
+
+			int minThre = std::max(20, thre - 100);
+			int maxThre = std::min(230, thre + 100);
+
+			int res = -100;
+			std::string cell_result;
+
+			for (int threT = minThre; threT <= maxThre && res!=0 ; threT += 10)
+			{
+
+				cout << "set threshold to " << threT << endl;
+				int thre = (int)threshold(src_gray, binImg, threT, 255, cv::THRESH_BINARY);
+
+			Ref<LuminanceSource> source = MatSource::create(binImg);
 
 			// Search for QR code
 			Ref<Reader> reader;
@@ -85,11 +101,10 @@ int main(int argc, char** argv) {
 
 			Ref<Binarizer> binarizer(new GlobalHistogramBinarizer(source));
 			Ref<BinaryBitmap> bitmap(new BinaryBitmap(binarizer));
-			int res = 0;
-			std::string cell_result;
 			try {
 				Ref<Result> result = reader->decode(bitmap, DecodeHints(DecodeHints::TRYHARDER_HINT));
 				cell_result = result->getText()->getText();
+				res = 0;
 			}
 			catch (const ReaderException& e) {
 				cell_result = "zxing::ReaderException: " + string(e.what());
@@ -108,6 +123,7 @@ int main(int argc, char** argv) {
 				res = -5;
 			}
 			cout << "decode status:"<<res<<" result:"<<cell_result << endl;
+			}
 
 
 		} while (_findnext(hFind, &fd)==0);
