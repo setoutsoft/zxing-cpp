@@ -52,7 +52,72 @@ Point toCvPoint(Ref<ResultPoint> resultPoint) {
     return Point(resultPoint->getX(), resultPoint->getY());
 }
 
+#include <io.h>
 int main(int argc, char** argv) {
+	std::string filename = argv[1];
+
+	struct _finddata_t fd;
+	intptr_t hFind = _findfirst(filename.c_str(), &fd);
+
+	if (hFind!=-1) {
+		std::string path;
+		int pos = filename.rfind('\\');
+		if (pos != -1)
+		{
+			path = filename.substr(0, pos + 1);
+		}
+		do
+		{
+			std::string fname = path + fd.name;
+			printf("check %s:\n", fname.c_str());
+			Mat src;
+			Mat src_gray;
+			src = imread(fname, 1);
+			cvtColor(src, src_gray, CV_BGR2GRAY);
+			blur(src_gray, src_gray, Size(3, 3));
+			equalizeHist(src_gray, src_gray);
+
+			Ref<LuminanceSource> source = MatSource::create(src_gray);
+
+			// Search for QR code
+			Ref<Reader> reader;
+			reader.reset(new QRCodeReader);
+
+			Ref<Binarizer> binarizer(new GlobalHistogramBinarizer(source));
+			Ref<BinaryBitmap> bitmap(new BinaryBitmap(binarizer));
+			int res = 0;
+			std::string cell_result;
+			try {
+				Ref<Result> result = reader->decode(bitmap, DecodeHints(DecodeHints::TRYHARDER_HINT));
+				cell_result = result->getText()->getText();
+			}
+			catch (const ReaderException& e) {
+				cell_result = "zxing::ReaderException: " + string(e.what());
+				res = -2;
+			}
+			catch (const zxing::IllegalArgumentException& e) {
+				cell_result = "zxing::IllegalArgumentException: " + string(e.what());
+				res = -3;
+			}
+			catch (const zxing::Exception& e) {
+				cell_result = "zxing::Exception: " + string(e.what());
+				res = -4;
+			}
+			catch (const std::exception& e) {
+				cell_result = "std::exception: " + string(e.what());
+				res = -5;
+			}
+			cout << "decode status:"<<res<<" result:"<<cell_result << endl;
+
+
+		} while (_findnext(hFind, &fd)==0);
+		_findclose(hFind);
+	}
+
+	return 0;
+}
+
+int main2(int argc, char** argv) {
 
     int deviceId = 0;
     int captureWidth = 640;
@@ -124,6 +189,7 @@ int main(int argc, char** argv) {
     // Log
     cout << "Capturing from device " << deviceId << "..." << endl;
 
+	/*
     // Open video captire
     VideoCapture videoCapture(deviceId);
 
@@ -148,7 +214,7 @@ int main(int argc, char** argv) {
         cerr << "Failed to set frame height: " << captureHeight << " (ignoring)" << endl;
 
     }
-
+	*/
     // The captured image and its grey conversion
     Mat image, grey;
 
@@ -161,9 +227,9 @@ int main(int argc, char** argv) {
     while (stopped == -1) {
 
         // Capture image
-        bool result = videoCapture.read(image);
+        //bool result = videoCapture.read(image);
 
-        if (result) {
+        if (false) {
 
             // Convert to grayscale
             cvtColor(image, grey, CV_BGR2GRAY);
@@ -247,7 +313,7 @@ int main(int argc, char** argv) {
     }
 
     // Release video capture
-    videoCapture.release();
+    //videoCapture.release();
 
     return 0;
 
